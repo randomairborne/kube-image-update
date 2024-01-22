@@ -66,6 +66,7 @@ func main() {
 	})
 	mux.Get("/live", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(200)
+
 	})
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -76,8 +77,16 @@ func main() {
 }
 
 func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
-	deploymentNamespace := r.Context().Value("namespace").(string)
-	deploymentName := r.Context().Value("deployment").(string)
+	deploymentNamespace, ok := r.Context().Value("namespace").(string)
+	if !ok {
+		w.WriteHeader(422)
+		return
+	}
+	deploymentName, ok := r.Context().Value("deployment").(string)
+	if !ok {
+		w.WriteHeader(422)
+		return
+	}
 	deployment := Deployment{
 		namespace: deploymentNamespace,
 		name:      deploymentName,
