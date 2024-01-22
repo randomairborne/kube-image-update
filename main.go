@@ -71,6 +71,7 @@ func main() {
 		Addr:    ":8080",
 		Handler: mux,
 	}
+	log.Println("Starting HTTP server on 0.0.0.0:8080")
 	log.Fatal(srv.ListenAndServe())
 }
 
