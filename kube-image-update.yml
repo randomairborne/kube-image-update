@@ -13,6 +13,7 @@ spec:
       labels:
         app: kube-image-update
     spec:
+      serviceAccountName: image-update-account
       containers:
         - name: kube-image-update
           image: ghcr.io/randomairborne/kube-image-update:latest
@@ -29,3 +30,42 @@ spec:
             requests:
               cpu: 10m
               memory: 128Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: image-update-account
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: image-update-role
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+    resourceNames:
+      - kube-restart-tokens
+  - apiGroups:
+      - ""
+    resources:
+      - deployments
+    verbs:
+      - update
+      - get
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: image-update-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: image-update-role
+subjects:
+  - kind: ServiceAccount
+    name: image-update-account
