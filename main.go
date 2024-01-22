@@ -91,7 +91,8 @@ func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authSig, err := hex.DecodeString(authHeader)
+	trimmedAuthHex, _ := strings.CutPrefix(authHeader, "sha256=")
+	authSig, err := hex.DecodeString(trimmedAuthHex)
 	if err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(400)
@@ -130,7 +131,6 @@ func (state *State) RestartDeployment(ctx context.Context, namespace string, dep
 
 func checkMac(payload []byte, payloadMAC []byte, key []byte) bool {
 	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte("sha256="))
 	mac.Write(payload)
 	expectedMAC := mac.Sum(nil)
 	return hmac.Equal(payloadMAC, expectedMAC)
