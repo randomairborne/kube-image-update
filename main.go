@@ -60,7 +60,7 @@ func main() {
 		kube:   kubeClient,
 		tokens: tokens,
 	}
-	mux := chi.NewMux()
+	mux := chi.NewRouter()
 	mux.Post("/restart/{namespace}/{deployment}", func(w http.ResponseWriter, r *http.Request) {
 		state.HandleHttp(w, r)
 	})
@@ -77,16 +77,8 @@ func main() {
 }
 
 func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
-	deploymentNamespace, ok := r.Context().Value("namespace").(string)
-	if !ok {
-		w.WriteHeader(422)
-		return
-	}
-	deploymentName, ok := r.Context().Value("deployment").(string)
-	if !ok {
-		w.WriteHeader(422)
-		return
-	}
+	deploymentNamespace := chi.URLParam(r, "namespace")
+	deploymentName := chi.URLParam(r, "deployment")
 	deployment := Deployment{
 		namespace: deploymentNamespace,
 		name:      deploymentName,
