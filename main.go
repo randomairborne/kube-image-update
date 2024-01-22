@@ -38,36 +38,21 @@ func main() {
 		panic(err.Error())
 	}
 	kubeClient := kubernetes.NewForConfigOrDie(icc)
-	authSecret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.Background(), "kube-restart-tokens", metav1.GetOptions{})
-	if err != nil {
-		panic(err.Error())
-	}
-	tokens := make(map[Deployment][]byte, len(authSecret.Data))
-	for key, token := range authSecret.Data {
-		split := strings.Split(key, ".")
-		if len(split) != 2 {
-			panic(fmt.Sprintf("key %s could not be split into a namespace and name at .", key))
-		}
-		namespace, name := split[0], split[1]
-		deployment := Deployment{
-			namespace: namespace,
-			name:      name,
-		}
-		tokens[deployment] = token
-		log.Println(fmt.Sprintf("got ns %s and deployment %s", namespace, name))
-	}
+	tokens := getTokens(*kubeClient, secretNamespace)
+
 	state := State{
 		kube:   kubeClient,
 		tokens: tokens,
 	}
+
 	mux := chi.NewRouter()
 	mux.Post("/restart/{namespace}/{deployment}", func(w http.ResponseWriter, r *http.Request) {
 		state.HandleHttp(w, r)
 	})
 	mux.Get("/live", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(200)
-
 	})
+
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
@@ -141,4 +126,26 @@ func checkMac(payload []byte, payloadMAC []byte, key []byte) bool {
 	mac.Write(payload)
 	expectedMAC := mac.Sum(nil)
 	return hmac.Equal(payloadMAC, expectedMAC)
+}
+
+func getTokens(kubeClient kubernetes.Clientset, namespace string) map[Deployment][]byte {
+	authSecret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), "kube-restart-tokens", metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	tokens := make(map[Deployment][]byte, len(authSecret.Data))
+	for key, token := range authSecret.Data {
+		split := strings.Split(key, ".")
+		if len(split) != 2 {
+			panic(fmt.Sprintf("key %s could not be split into a namespace and name at .", key))
+		}
+		deploymentNamespace, deploymentName := split[0], split[1]
+		deployment := Deployment{
+			namespace: deploymentNamespace,
+			name:      deploymentName,
+		}
+		tokens[deployment] = token
+		log.Println(fmt.Sprintf("got namespace %s and deployment %s", deploymentNamespace, deploymentName))
+	}
+	return tokens
 }
