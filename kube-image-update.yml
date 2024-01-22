@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: kube-image-update
-          image: ghcr.io/randomairborne/kube:latest
+          image: ghcr.io/randomairborne/kube-image-update:latest
           livenessProbe:
             httpGet:
               path: /live
