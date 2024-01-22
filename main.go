@@ -100,7 +100,13 @@ func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authzd := checkMac(body, authSig, state.tokens[deployment])
+	token, exists := state.tokens[deployment]
+	if !exists {
+		w.WriteHeader(404)
+		return
+	}
+
+	authzd := checkMac(body, authSig, token)
 	if !authzd {
 		w.WriteHeader(401)
 		return
