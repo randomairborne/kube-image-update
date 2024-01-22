@@ -50,7 +50,7 @@ rules:
     resourceNames:
       - kube-restart-tokens
   - apiGroups:
-      - ""
+      - "*"
     resources:
       - deployments
     verbs:
