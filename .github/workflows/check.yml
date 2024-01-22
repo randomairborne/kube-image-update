@@ -1,0 +1,21 @@
+name: Cargo Check
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+
+      - name: Show discrepant formatting
+        run: gofmt -l .
+
+      - name: Check formatting
+        run: test -z $(gofmt -l .)
+
+      - name: Check build
+        run: go build

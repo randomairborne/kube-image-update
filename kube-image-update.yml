@@ -1,0 +1,31 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-image-update
+spec:
+  selector:
+    matchLabels:
+      app: kube-image-update
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: kube-image-update
+    spec:
+      containers:
+        - name: kube-image-update
+          image: ghcr.io/randomairborne/kube:latest
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8080
+            failureThreshold: 1
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
