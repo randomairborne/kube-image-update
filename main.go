@@ -54,7 +54,7 @@ func main() {
 			name:      name,
 		}
 		tokens[deployment] = token
-
+		log.Println(fmt.Sprintf("got ns %s and deployment %s", namespace, name))
 	}
 	state := State{
 		kube:   kubeClient,
