@@ -46,6 +46,8 @@ data:
   default.kubeimageupdate: c2Vrcml0Cg== # also randomly generated
 ```
 
+Make sure when you run `base64`, there's no newline!
+
 You can then set your GitHub webhooks to a path like
 `https://kube-hooks.example.com/core/userauth` to select
 the userauth deployment on the core namespace with the unencoded
