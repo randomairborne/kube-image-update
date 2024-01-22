@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"io"
@@ -91,8 +92,8 @@ func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authSigString, _ := strings.CutPrefix(authHeader, "sha256=")
-	authSig := []byte(authSigString)
+	trimmedAuthHex, _ := strings.CutPrefix(authHeader, "sha256=")
+	authSig, err := hex.DecodeString(trimmedAuthHex)
 	if err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(400)
