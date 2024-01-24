@@ -87,21 +87,24 @@ func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 
 	token, exists := state.tokens[deployment]
 	if !exists {
+		log.Printf("Could not find deployment %s.%s", deployment.namespace, deployment.name)
 		w.WriteHeader(404)
 		return
 	}
 
 	authzd := checkMac(body, authSig, token)
 	if !authzd {
+		log.Println("Failed to validate MAC")
 		w.WriteHeader(401)
 		return
 	}
 
 	err = state.RestartDeployment(r.Context(), deploymentNamespace, deploymentName)
 	if err != nil {
-		w.WriteHeader(500)
 		log.Println(err.Error())
+		w.WriteHeader(500)
 	} else {
+		log.Printf("Restarted deployment %s.%s", deployment.namespace, deployment.name)
 		w.WriteHeader(204)
 	}
 }
