@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/go-chi/chi/v5 v5.0.11
-	k8s.io/apimachinery v0.29.1
+	k8s.io/apimachinery v0.29.2
 	k8s.io/client-go v0.29.1
 )
 
