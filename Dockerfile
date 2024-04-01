@@ -6,8 +6,8 @@ COPY . .
 
 RUN go build
 
-FROM alpine
+FROM scratch
 
 COPY --from=builder /build/kube-image-update /usr/bin/kube-image-update
 
-ENTRYPOINT ["kube-image-update"]
+ENTRYPOINT ["/usr/bin/kube-image-update"]
