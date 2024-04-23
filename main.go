@@ -6,16 +6,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type Deployment struct {
@@ -23,9 +25,61 @@ type Deployment struct {
 	name      string
 }
 
+type Unit struct{}
+
 type State struct {
-	kube   *kubernetes.Clientset
-	tokens map[Deployment][]byte
+	kube         *kubernetes.Clientset
+	namespace    string
+	waitForToken <-chan map[Deployment][]byte
+	updateToken  chan<- map[Deployment][]byte
+	requestToken chan<- Unit
+}
+
+func (s *State) GetTokens() map[Deployment][]byte {
+	s.requestToken <- Unit{}
+	return <-s.waitForToken
+}
+
+func (s *State) SetTokens(tokens map[Deployment][]byte) {
+	s.updateToken <- tokens
+}
+
+func NewState(cs *kubernetes.Clientset, namespace string) State {
+	reqs := make(chan Unit)
+	resps := make(chan map[Deployment][]byte)
+	mutates := make(chan map[Deployment][]byte)
+	go service(reqs, resps, mutates)
+	return State{
+		kube:         cs,
+		waitForToken: resps,
+		updateToken:  mutates,
+		requestToken: reqs,
+	}
+}
+
+func service(req <-chan Unit, resp chan<- map[Deployment][]byte, mutate <-chan map[Deployment][]byte) {
+	data := make(map[Deployment][]byte)
+	for {
+		select {
+		case <-req:
+			resp <- data
+		case data = <-mutate:
+		}
+	}
+}
+
+func (s *State) updateSecrets() {
+	auth, err := s.kube.CoreV1().Secrets(s.namespace).Watch(context.Background(), metav1.ListOptions{
+		LabelSelector: "kube-restart-tokens",
+	})
+	if err != nil {
+		panic(err)
+	}
+	rc := auth.ResultChan()
+	for {
+		<-rc
+		s.SetTokens(getTokens(*s.kube, s.namespace))
+	}
 }
 
 func main() {
@@ -38,12 +92,13 @@ func main() {
 		panic(err.Error())
 	}
 	kubeClient := kubernetes.NewForConfigOrDie(icc)
-	tokens := getTokens(*kubeClient, secretNamespace)
 
-	state := State{
-		kube:   kubeClient,
-		tokens: tokens,
-	}
+	state := NewState(kubeClient, secretNamespace)
+
+	tokens := getTokens(*kubeClient, secretNamespace)
+	state.SetTokens(tokens)
+
+	go state.updateSecrets()
 
 	mux := chi.NewRouter()
 	mux.Post("/restart/{namespace}/{deployment}", func(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +140,7 @@ func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, exists := state.tokens[deployment]
+	token, exists := state.GetTokens()[deployment]
 	if !exists {
 		log.Printf("Could not find deployment %s.%s", deployment.namespace, deployment.name)
 		w.WriteHeader(404)
@@ -136,8 +191,13 @@ func getTokens(kubeClient kubernetes.Clientset, namespace string) map[Deployment
 	if err != nil {
 		panic(err.Error())
 	}
-	tokens := make(map[Deployment][]byte, len(authSecret.Data))
-	for key, token := range authSecret.Data {
+
+	return secretToTokens(*authSecret)
+}
+
+func secretToTokens(secret v1.Secret) map[Deployment][]byte {
+	tokens := make(map[Deployment][]byte, len(secret.Data))
+	for key, token := range secret.Data {
 		split := strings.Split(key, ".")
 		if len(split) != 2 {
 			panic(fmt.Sprintf("key %s could not be split into a namespace and name at .", key))
@@ -148,7 +208,7 @@ func getTokens(kubeClient kubernetes.Clientset, namespace string) map[Deployment
 			name:      deploymentName,
 		}
 		tokens[deployment] = token
-		log.Println(fmt.Sprintf("got namespace %s and deployment %s", deploymentNamespace, deploymentName))
+		log.Printf("got namespace %s and deployment %s", deploymentNamespace, deploymentName)
 	}
 	return tokens
 }
