@@ -70,11 +70,13 @@ func service(req <-chan Unit, resp chan<- map[Deployment][]byte, mutate <-chan m
 
 func (s *State) updateSecrets() {
 	var hundred_years int64 = 86400 * 365 * 100;
-	auth, err := s.kube.CoreV1().Secrets(s.namespace).Watch(context.Background(), metav1.ListOptions{
-		LabelSelector: "kube-restart-tokens",
-		Watch: true,
-		TimeoutSeconds: &hundred_years,
+	opts := metav1.SingleObject(metav1.ObjectMeta{
+		Name: "kube-restart-tokens",
+		Namespace: s.namespace,
+		
 	})
+	opts.TimeoutSeconds = &hundred_years
+	auth, err := s.kube.CoreV1().Secrets(s.namespace).Watch(context.Background(), opts)
 	if err != nil {
 		panic(err)
 	}
