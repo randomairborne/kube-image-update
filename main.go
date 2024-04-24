@@ -16,9 +16,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+var SecretName string = "kube-restart-tokens"
 
 type Deployment struct {
 	namespace string
@@ -51,6 +54,7 @@ func NewState(cs *kubernetes.Clientset, namespace string) State {
 	go service(reqs, resps, mutates)
 	return State{
 		kube:         cs,
+		namespace:    namespace,
 		waitForToken: resps,
 		updateToken:  mutates,
 		requestToken: reqs,
@@ -70,20 +74,24 @@ func service(req <-chan Unit, resp chan<- map[Deployment][]byte, mutate <-chan m
 
 func (s *State) updateSecrets() {
 	var hundred_years int64 = 86400 * 365 * 100
-	opts := metav1.SingleObject(metav1.ObjectMeta{
-		Name:      "kube-restart-tokens",
-		Namespace: s.namespace,
-	})
-	opts.TimeoutSeconds = &hundred_years
+	sendInitials := false
+	opts := metav1.ListOptions{
+		FieldSelector:     fields.OneTermEqualSelector("metadata.name", SecretName).String(),
+		ResourceVersion:   "v1.meta/ObjectMeta",
+		TimeoutSeconds:    &hundred_years,
+		Watch:             true,
+		SendInitialEvents: &sendInitials,
+	}
+	fmt.Printf("starting to watch %s/secrets/%s\n", s.namespace, SecretName)
 	auth, err := s.kube.CoreV1().Secrets(s.namespace).Watch(context.Background(), opts)
 	if err != nil {
 		panic(fmt.Sprintf("Error getting secrets: `%s` (do you have the watch verb for secrets?)", err.Error()))
 	}
 	rc := auth.ResultChan()
 	for {
-		event:=<-rc
-		secret := v1.Secret(event)
-		tokens := secretToTokens(secret)
+		event := <-rc
+		secret := event.Object.(*v1.Secret)
+		tokens := secretToTokens(*secret)
 		s.SetTokens(tokens)
 	}
 }
@@ -101,7 +109,7 @@ func main() {
 
 	state := NewState(kubeClient, secretNamespace)
 
-	tokens := getTokens(*kubeClient, secretNamespace)
+	tokens := state.loadTokens()
 	state.SetTokens(tokens)
 
 	go state.updateSecrets()
@@ -192,8 +200,8 @@ func checkMac(payload []byte, payloadMAC []byte, key []byte) bool {
 	return hmac.Equal(payloadMAC, expectedMAC)
 }
 
-func getTokens(kubeClient kubernetes.Clientset, namespace string) map[Deployment][]byte {
-	authSecret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), "kube-restart-tokens", metav1.GetOptions{})
+func (s *State) loadTokens() map[Deployment][]byte {
+	authSecret, err := s.kube.CoreV1().Secrets(s.namespace).Get(context.Background(), SecretName, metav1.GetOptions{})
 	if err != nil {
 		panic(err.Error())
 	}
