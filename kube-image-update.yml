@@ -63,6 +63,7 @@ rules:
       - secrets
     verbs:
       - get
+      - watch
     resourceNames:
       - kube-restart-tokens
   - apiGroups:
