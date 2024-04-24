@@ -76,11 +76,11 @@ func (s *State) updateSecrets() {
 	var hundred_years int64 = 86400 * 365 * 100
 	sendInitials := false
 	opts := metav1.ListOptions{
-		FieldSelector:     fields.OneTermEqualSelector("metadata.name", SecretName).String(),
-		ResourceVersion:   "v1.meta/ObjectMeta",
-		TimeoutSeconds:    &hundred_years,
-		Watch:             true,
-		SendInitialEvents: &sendInitials,
+		FieldSelector:        fields.OneTermEqualSelector("metadata.name", SecretName).String(),
+		TimeoutSeconds:       &hundred_years,
+		Watch:                true,
+		SendInitialEvents:    &sendInitials,
+		ResourceVersionMatch: "NotOlderThan",
 	}
 	fmt.Printf("starting to watch %s/secrets/%s\n", s.namespace, SecretName)
 	auth, err := s.kube.CoreV1().Secrets(s.namespace).Watch(context.Background(), opts)
@@ -91,6 +91,7 @@ func (s *State) updateSecrets() {
 	for {
 		event := <-rc
 		secret := event.Object.(*v1.Secret)
+		fmt.Println("Got new secret to watch")
 		tokens := secretToTokens(*secret)
 		s.SetTokens(tokens)
 	}
@@ -108,9 +109,6 @@ func main() {
 	kubeClient := kubernetes.NewForConfigOrDie(icc)
 
 	state := NewState(kubeClient, secretNamespace)
-
-	tokens := state.loadTokens()
-	state.SetTokens(tokens)
 
 	go state.updateSecrets()
 
@@ -198,15 +196,6 @@ func checkMac(payload []byte, payloadMAC []byte, key []byte) bool {
 	mac.Write(payload)
 	expectedMAC := mac.Sum(nil)
 	return hmac.Equal(payloadMAC, expectedMAC)
-}
-
-func (s *State) loadTokens() map[Deployment][]byte {
-	authSecret, err := s.kube.CoreV1().Secrets(s.namespace).Get(context.Background(), SecretName, metav1.GetOptions{})
-	if err != nil {
-		panic(err.Error())
-	}
-
-	return secretToTokens(*authSecret)
 }
 
 func secretToTokens(secret v1.Secret) map[Deployment][]byte {
