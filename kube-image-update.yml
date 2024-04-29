@@ -16,10 +16,11 @@ spec:
       serviceAccountName: image-update-account
       containers:
         - name: kube-image-update
-          image: ghcr.io/randomairborne/kube-image-update:latest
+          image: ghcr.io/randomairborne/kube-image-update:super-unstable
+          imagePullPolicy: Always
           env:
             - name: TOKEN_SECRET_NAMESPACE
-              value: stateless
+              value: default
           livenessProbe:
             httpGet:
               path: /live
@@ -86,4 +87,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: image-update-account
-    namespace: stateless
+    namespace: default

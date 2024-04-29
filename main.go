@@ -73,11 +73,11 @@ func service(req <-chan Unit, resp chan<- map[Deployment][]byte, mutate <-chan m
 }
 
 func (s *State) updateSecrets() {
-	var hundred_years int64 = 86400 * 365 * 100
-	sendInitials := false
+	var timeout int64 = 86400 * 365 * 100
+	sendInitials := true
 	opts := metav1.ListOptions{
 		FieldSelector:        fields.OneTermEqualSelector("metadata.name", SecretName).String(),
-		TimeoutSeconds:       &hundred_years,
+		TimeoutSeconds:       &timeout,
 		Watch:                true,
 		SendInitialEvents:    &sendInitials,
 		ResourceVersionMatch: "NotOlderThan",
@@ -128,7 +128,7 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
+func (s *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 	deploymentNamespace := chi.URLParam(r, "namespace")
 	deploymentName := chi.URLParam(r, "deployment")
 	deployment := Deployment{
@@ -152,7 +152,7 @@ func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, exists := state.GetTokens()[deployment]
+	token, exists := s.GetTokens()[deployment]
 	if !exists {
 		log.Printf("Could not find deployment %s.%s", deployment.namespace, deployment.name)
 		w.WriteHeader(404)
@@ -166,7 +166,7 @@ func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = state.RestartDeployment(r.Context(), deploymentNamespace, deploymentName)
+	err = s.RestartDeployment(r.Context(), deploymentNamespace, deploymentName)
 	if err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(500)
@@ -176,8 +176,8 @@ func (state *State) HandleHttp(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (state *State) RestartDeployment(ctx context.Context, namespace string, deployName string) error {
-	deployment, err := state.kube.AppsV1().Deployments(namespace).Get(ctx, deployName, metav1.GetOptions{})
+func (s *State) RestartDeployment(ctx context.Context, namespace string, deployName string) error {
+	deployment, err := s.kube.AppsV1().Deployments(namespace).Get(ctx, deployName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func (state *State) RestartDeployment(ctx context.Context, namespace string, dep
 	}
 	deployment.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
-	_, err = state.kube.AppsV1().Deployments(namespace).Update(ctx, deployment, metav1.UpdateOptions{})
+	_, err = s.kube.AppsV1().Deployments(namespace).Update(ctx, deployment, metav1.UpdateOptions{})
 	return err
 }
 
