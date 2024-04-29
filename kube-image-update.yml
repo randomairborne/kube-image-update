@@ -16,7 +16,7 @@ spec:
       serviceAccountName: image-update-account
       containers:
         - name: kube-image-update
-          image: ghcr.io/randomairborne/kube-image-update:super-unstable
+          image: ghcr.io/randomairborne/kube-image-update:latest
           imagePullPolicy: Always
           env:
             - name: TOKEN_SECRET_NAMESPACE
