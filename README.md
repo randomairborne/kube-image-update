@@ -1,6 +1,8 @@
 # kube-image-update
 
-## Totally broken, archived in favor of service accounts and kubectl 
+## Totally broken, archived in favor of service accounts and kubectl
+
+### [you can learn about how to do that here](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#manually-create-a-long-lived-api-token-for-a-serviceaccount_
 
 ## About
 
