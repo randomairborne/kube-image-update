@@ -1,4 +1,6 @@
-# kubeImageUpdate
+# kube-image-update
+
+## Totally broken, archived in favor of service accounts and kubectl 
 
 ## About
 
